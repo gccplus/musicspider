@@ -215,7 +215,7 @@ def analyse_song_page(song_list):
         release_comp = album_json['company']
 
         comment_thread = song_json['commentThreadId']
-        print song_id,song_name
+        print 'song_id:%s' % song_id
 
         url = 'http://music.163.com/weapi/v1/resource/comments/' + comment_thread
         params = get_params(1)
@@ -288,7 +288,7 @@ def analyse_song_page(song_list):
                     flag = False
                     break
             if flag:
-                if not session.query(Album).get(album.id):
+                if not session.query(Album).get(int(album.id)):
                     session.add(album)
         session.commit()
         lock.release()
