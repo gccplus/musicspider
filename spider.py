@@ -294,12 +294,11 @@ def analyse_song_page(song_list):
         lock.release()
 
 if __name__ == "__main__":
-    #artist_category_list = get_artist_category_ids()
-    #artist_list = get_artist_by_category_id(artist_category_list)[:3]
-
-    artist_list = []
-    for artist in session.query(Artist):
-        artist_list.append(artist.id)
+    artist_category_list = get_artist_category_ids()
+    artist_list = get_artist_by_category_id(artist_category_list)
+    #artist_list = []
+    #for artist in session.query(Artist):
+    #    artist_list.append(artist.id)
     album_process_count = int(sys.argv[1])
     print album_process_count
     album_process_list = []
