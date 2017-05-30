@@ -3,6 +3,7 @@ import sys,requests,re,threading,time
 from bs4 import BeautifulSoup
 from models import ArtistCategory,Artist,Album,Song,Comment,session
 import Queue
+import multiprocessing
 baseurl = 'http://music.163.com'
 
 lock = threading.Lock()
@@ -295,23 +296,24 @@ def analyse_song_page(song_list):
 if __name__ == "__main__":
     #artist_category_list = get_artist_category_ids()
     #artist_list = get_artist_by_category_id(artist_category_list)[:3]
+
     artist_list = []
     for artist in session.query(Artist):
         artist_list.append(artist.id)
-    #默认开启10个线程，获取album_list
-    album_thread_count = 100
-    album_thread_list = []
+    album_process_count = int(sys.argv[1])
+    print album_process_count
+    album_process_list = []
     artist_count = len(artist_list)
-    for i in range(album_thread_count):
-        begin = artist_count/album_thread_count * i
-        end = artist_count/album_thread_count * (i+1)
+    for i in range(album_process_count):
+        begin = artist_count/album_process_count * i
+        end = artist_count/album_process_count * (i+1)
         artist_list_slice = artist_list[begin:end]
-        t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,))
-        album_thread_list.append(t)
-        t.start()
-    #等待线程结束
-    for t in album_thread_list:
-        t.join()
+        p = multiprocessing.Process(target=get_album_by_artist, args=(artist_list_slice,))
+        album_process_list.append(p)
+        p.start()
+    #等待进程结束
+    for p in album_process_list:
+        p.join()
 
 
 
