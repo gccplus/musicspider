@@ -299,7 +299,7 @@ if __name__ == "__main__":
     #artist_list = []
     #for artist in session.query(Artist):
     #    artist_list.append(artist.id)
-    album_process_count = int(sys.argv[1])
+    album_process_count = 10
     print album_process_count
     album_process_list = []
     artist_count = len(artist_list)
