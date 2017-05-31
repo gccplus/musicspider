@@ -1,9 +1,10 @@
 #coding=utf-8
 import sys,requests,re,threading,time
-from bs4 import BeautifulSoup
-from models import ArtistCategory,Artist,Album,Song,Comment,session
 import Queue
 import multiprocessing
+from bs4 import BeautifulSoup
+from models import ArtistCategory,Artist,Album,Song,Comment,session
+
 baseurl = 'http://music.163.com'
 
 lock = threading.Lock()
@@ -112,7 +113,6 @@ def get_artist_by_category_id(artist_category_id_list):
 def get_album_by_artist(artist_list):
     proxies = None
     album_list = []
-    thread_list = []
     for artist_id in artist_list:
         url = baseurl + '/artist/album?id=%s&limit=200' % artist_id
         print url
@@ -134,28 +134,39 @@ def get_album_by_artist(artist_list):
                 if match:
                     id = match.group(1)
                     album_list.append(id)
-                    if len(album_list) == 200:
-                        t = threading.Thread(target=get_song_by_album,args=(album_list,))
-                        thread_list.append(t)
-                        t.start()
+                    if len(album_list) == 1000:
+                        #开启20个线程
+                        thread_list = []
+                        for i in range(20):
+                            album_list_slice = album_list[50*i:50*(i+1)]
+                            t = threading.Thread(target=get_song_by_album, args=(album_list_slice,))
+                            thread_list.append(t)
+                            t.start()
+                        #等待线程结束后，再开启20个线程，目的是为了控制内存消耗
+                        for t in thread_list:
+                            t.join()
                         album_list = []
     if len(album_list) > 0:
-        t = threading.Thread(target=get_song_by_album, args=(album_list,))
-        thread_list.append(t)
-        t.start()
-        album_list = []
-
-    for t in thread_list:
-        t.join()
+        album_count = len(album_list)
+        thread_list = []
+        for i in range(20):
+            begin = album_count/20 * i
+            end = album_count/20 * (i+1)
+            album_list_slice = album_list[begin:end]
+            t = threading.Thread(target=get_song_by_album, args=(album_list_slice,))
+            thread_list.append(t)
+            t.start()
+        # 等待线程结束
+        for t in thread_list:
+            t.join()
 
 def get_song_by_album(album_list):
     print 'current thread: get_song_by_album %s' % threading.current_thread().getName()
     song_list = []
     proxies = None
-    thread_list = []
     for alb_id in album_list:
         url = baseurl + '/album?id=%s' % alb_id
-        print url
+        print 'active thread:%d %s %s %s' % (threading.active_count(),multiprocessing.current_process().name,threading.current_thread().getName(),url)
         while True:
             try:
                 r = requests.get(url,proxies=proxies)
@@ -194,7 +205,6 @@ def get_song_by_album(album_list):
 def analyse_song_page(song_list):
     global lock
     proxies = None
-    print 'current thread analyse_song : %s' % threading.current_thread().getName()
     db_song = []
     db_album = []
     db_comment = []
@@ -215,7 +225,8 @@ def analyse_song_page(song_list):
         release_comp = album_json['company']
 
         comment_thread = song_json['commentThreadId']
-        print 'song_id:%s' % song_id
+        print 'active thread:%d %s %s songid:%s' % (
+        threading.active_count(), multiprocessing.current_process().name, threading.current_thread().getName(), song_id)
 
         url = 'http://music.163.com/weapi/v1/resource/comments/' + comment_thread
         params = get_params(1)
@@ -269,7 +280,7 @@ def analyse_song_page(song_list):
                 highpoints = re.compile(u'[\uD800-\uDBFF][\uDC00-\uDFFF]')
 
             content = highpoints.sub(u'??', item['content'])
-            comment.content = content
+            comment.content = content[:300]
             comment.liked_count = int(item['likedCount'])
             timestamp = str(item['time'])
             comment.timestamp = time.strftime('%Y%m%d%H%M%S',time.localtime(float(timestamp[:10]+'.'+timestamp[-3:])))
@@ -288,18 +299,27 @@ def analyse_song_page(song_list):
                     flag = False
                     break
             if flag:
-                if not session.query(Album).get(int(album.id)):
-                    session.add(album)
+                session.execute(
+                    Album.__table__.insert().prefix_with('IGNORE'),
+                    {'id': album.id,
+                     'alb_name':album.alb_name,
+                     'alb_desc':'',
+                     'alb_cover':album.alb_cover,
+                     'alb_size':album.alb_size,
+                     'artist_id':album.artist_id,
+                     'release_time':album.release_time,
+                     'release_comp':album.release_comp}
+                )
         session.commit()
         lock.release()
 
 if __name__ == "__main__":
-    artist_category_list = get_artist_category_ids()
-    artist_list = get_artist_by_category_id(artist_category_list)
-    #artist_list = []
-    #for artist in session.query(Artist):
-    #    artist_list.append(artist.id)
-    album_process_count = 10
+    #artist_category_list = get_artist_category_ids()
+    #artist_list = get_artist_by_category_id(artist_category_list)
+    artist_list = []
+    for artist in session.query(Artist):
+        artist_list.append(artist.id)
+    album_process_count = 5
     print album_process_count
     album_process_list = []
     artist_count = len(artist_list)

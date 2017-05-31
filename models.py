@@ -11,7 +11,7 @@ session = Session()
 class Song(Base):
     __tablename__ = 'song'
     id = Column(Integer, primary_key=True)
-    name = Column(String(100))
+    name = Column(String(255))
     duration = Column(String(20))
     artist_id = Column(Integer)
     album_id = Column(Integer)
@@ -33,7 +33,7 @@ class Artist(Base):
 class Album(Base):
     __tablename__ = 'album'
     id = Column(Integer,primary_key=True)
-    alb_name = Column(String(100))
+    alb_name = Column(String(255))
     alb_desc = Column(String(255))
     alb_cover = Column(String(255))
     alb_size = Column(Integer)
