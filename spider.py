@@ -289,7 +289,11 @@ def analyse_song_page(song_list):
             db_comment.append(comment)
         lock.acquire()
         for song in db_song:
-            session.add(song)
+            try:
+                session.add(song)
+            except:
+                session.rollback()
+                print 'insert song error'
         for comment in db_comment:
             session.add(comment)
         for album in db_album:
