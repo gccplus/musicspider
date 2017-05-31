@@ -330,6 +330,7 @@ if __name__ == "__main__":
         p = multiprocessing.Process(target=get_album_by_artist, args=(artist_list_slice,))
         album_process_list.append(p)
         p.start()
+
     #等待进程结束
     for p in album_process_list:
         p.join()
