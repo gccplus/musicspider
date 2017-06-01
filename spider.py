@@ -112,7 +112,6 @@ def get_artist_by_category_id(artist_category_id_list):
 def get_album_by_artist(artist_list):
     proxies = None
     album_list = []
-    thread_list = []
     for artist_id in artist_list:
         url = baseurl + '/artist/album?id=%s&limit=200' % artist_id
         print url
@@ -146,18 +145,18 @@ def get_album_by_artist(artist_list):
                         for t in thread_list:
                             t.join()
                         album_list = []
-        album_count = len(album_list)
-        thread_list = []
-        for i in range(20):
-            begin = album_count/20 * i
-            end = album_count/20 * (i+1)
-            album_list_slice = album_list[begin:end]
-            t = threading.Thread(target=get_song_by_album, args=(album_list_slice,))
-            thread_list.append(t)
-            t.start()
-        # 等待线程结束
-        for t in thread_list:
-            t.join()
+    album_count = len(album_list)
+    thread_list = []
+    for i in range(20):
+        begin = album_count/20 * i
+        end = album_count/20 * (i+1)
+        album_list_slice = album_list[begin:end]
+        t = threading.Thread(target=get_song_by_album, args=(album_list_slice,))
+        thread_list.append(t)
+        t.start()
+    # 等待线程结束
+    for t in thread_list:
+        t.join()
 
 def get_song_by_album(album_list):
     print 'current thread: get_song_by_album %s' % threading.current_thread().getName()
