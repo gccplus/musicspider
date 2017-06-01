@@ -1,12 +1,12 @@
 from sqlalchemy import Column, Integer, String
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker,scoped_session
 
-engine = create_engine('mysql://root:admin@192.168.127.55/music_spider?charset=utf8', echo=False)
+engine = create_engine('mysql://root:admin@192.168.127.55/music_spider?charset=utf8', echo=True)
 Base = declarative_base()
-Session = sessionmaker(bind=engine)
-session = Session()
+session_factory = sessionmaker(bind=engine)
+Session = scoped_session(session_factory)
 
 class Song(Base):
     __tablename__ = 'song'

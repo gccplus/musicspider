@@ -3,8 +3,7 @@ import sys,requests,re,threading,time
 import Queue
 import multiprocessing
 from bs4 import BeautifulSoup
-from models import ArtistCategory,Artist,Album,Song,Comment,session
-
+from models import ArtistCategory,Artist,Album,Song,Comment,Session
 baseurl = 'http://music.163.com'
 
 lock = threading.Lock()
@@ -113,6 +112,7 @@ def get_artist_by_category_id(artist_category_id_list):
 def get_album_by_artist(artist_list):
     proxies = None
     album_list = []
+    thread_list = []
     for artist_id in artist_list:
         url = baseurl + '/artist/album?id=%s&limit=200' % artist_id
         print url
@@ -135,7 +135,7 @@ def get_album_by_artist(artist_list):
                     id = match.group(1)
                     album_list.append(id)
                     if len(album_list) == 1000:
-                        #开启20个线程
+                        # #开启20个线程
                         thread_list = []
                         for i in range(20):
                             album_list_slice = album_list[50*i:50*(i+1)]
@@ -146,7 +146,6 @@ def get_album_by_artist(artist_list):
                         for t in thread_list:
                             t.join()
                         album_list = []
-    if len(album_list) > 0:
         album_count = len(album_list)
         thread_list = []
         for i in range(20):
@@ -287,43 +286,48 @@ def analyse_song_page(song_list):
             comment.user_id = int(item['user']['userId'])
             comment.nickname = item['user']['nickname']
             db_comment.append(comment)
-        lock.acquire()
-        for song in db_song:
-            try:
-                session.add(song)
-            except:
-                session.rollback()
-                print 'insert song error'
-        for comment in db_comment:
-            session.add(comment)
-        for album in db_album:
-            flag = True
-            for inner_album in db_album:
-                if inner_album != album and album.id == inner_album.id:
-                    flag = False
-                    break
-            if flag:
-                session.execute(
-                    Album.__table__.insert().prefix_with('IGNORE'),
-                    {'id': album.id,
-                     'alb_name':album.alb_name,
-                     'alb_desc':'',
-                     'alb_cover':album.alb_cover,
-                     'alb_size':album.alb_size,
-                     'artist_id':album.artist_id,
-                     'release_time':album.release_time,
-                     'release_comp':album.release_comp}
-                )
-        session.commit()
-        lock.release()
+
+            session = Session()
+            print session
+            for song in db_song:
+                try:
+                    session.add(song)
+                except:
+                    session.rollback()
+                    print 'insert song error'
+
+            for comment in db_comment:
+                session.add(comment)
+            for album in db_album:
+                flag = True
+                for inner_album in db_album:
+                    if inner_album != album and album.id == inner_album.id:
+                        flag = False
+                        break
+                if flag:
+                    session.execute(
+                        Album.__table__.insert().prefix_with('IGNORE'),
+                        {'id': album.id,
+                         'alb_name':album.alb_name,
+                         'alb_desc':'',
+                         'alb_cover':album.alb_cover,
+                         'alb_size':album.alb_size,
+                         'artist_id':album.artist_id,
+                         'release_time':album.release_time,
+                         'release_comp':album.release_comp}
+                    )
+            session.commit()
+            Session.remove()
 
 if __name__ == "__main__":
     #artist_category_list = get_artist_category_ids()
     #artist_list = get_artist_by_category_id(artist_category_list)
     artist_list = []
+    session = Session()
     for artist in session.query(Artist):
-        artist_list.append(artist.id)
-    album_process_count = 5
+       artist_list.append(artist.id)
+    Session.remove()
+    album_process_count = 10
     print album_process_count
     album_process_list = []
     artist_count = len(artist_list)
