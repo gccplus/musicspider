@@ -159,7 +159,6 @@ def get_album_by_artist(artist_list):
         t.join()
 
 def get_song_by_album(album_list):
-    print 'current thread: get_song_by_album %s' % threading.current_thread().getName()
     song_list = []
     proxies = None
     for alb_id in album_list:
@@ -286,8 +285,9 @@ def analyse_song_page(song_list):
             comment.nickname = item['user']['nickname']
             db_comment.append(comment)
 
+            lock.acquire()
             session = Session()
-            print session
+            #print session
             for song in db_song:
                 try:
                     session.add(song)
@@ -317,6 +317,7 @@ def analyse_song_page(song_list):
                     )
             session.commit()
             Session.remove()
+            lock.release()
 
 if __name__ == "__main__":
     #artist_category_list = get_artist_category_ids()
