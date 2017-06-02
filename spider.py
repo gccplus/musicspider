@@ -434,8 +434,8 @@ if __name__ == "__main__":
     lock = threading.Lock()
     song_queue = Queue.Queue()
 
-    album_thread_count = sys.argv[1]
-    song_thread_count = sys.argv[2]
+    album_thread_count = int(sys.argv[1])
+    song_thread_count = int(sys.argv[2])
     print album_thread_count,song_thread_count
     album_thread_list = []
     song_thread_list = []
