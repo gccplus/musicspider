@@ -345,7 +345,7 @@ if __name__ == "__main__":
     for artist in session.query(Artist):
         artist_list.append(artist.id)
     Session.remove()
-    album_process_count = 2
+    album_process_count = 1
     print album_process_count
     album_process_list = []
     artist_count = len(artist_list)
