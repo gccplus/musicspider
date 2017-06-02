@@ -163,7 +163,7 @@ def get_album_by_artist(artist_list):
         t.join()
 
 
-def get_song_by_album(album_list,semaphore):
+def get_song_by_album(album_list):
     song_list = []
     proxies = None
     for alb_id in album_list:
