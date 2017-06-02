@@ -7,10 +7,6 @@ from models import ArtistCategory, Artist, Album, Song, Comment, Session
 
 baseurl = 'http://music.163.com'
 
-lock = threading.Lock()
-album_list_queue = Queue.Queue()
-song_list_queue = Queue.Queue()
-
 from Crypto.Cipher import AES
 import base64
 import json
@@ -144,8 +140,8 @@ def get_album_by_artist(artist_list):
                     album_list.append(id)
                     if len(album_list) == 1000:
                         thread_list = []
-                        for i in range(50):
-                            album_list_slice = album_list[20*i : 20*(i+1)]
+                        for i in range(20):
+                            album_list_slice = album_list[50*i : 50*(i+1)]
                             t = threading.Thread(target=get_song_by_album, args=(album_list_slice,))
                             thread_list.append(t)
                             t.start()
@@ -155,9 +151,9 @@ def get_album_by_artist(artist_list):
                         album_list = []
     album_count = len(album_list)
     thread_list = []
-    for i in range(50):
-        begin = album_count / 50 * i
-        end = album_count / 50 * (i + 1)
+    for i in range(20):
+        begin = album_count / 20 * i
+        end = album_count / 20 * (i + 1)
         album_list_slice = album_list[begin:end]
         t = threading.Thread(target=get_song_by_album, args=(album_list_slice,))
         thread_list.append(t)
@@ -167,7 +163,7 @@ def get_album_by_artist(artist_list):
         t.join()
 
 
-def get_song_by_album(album_list):
+def get_song_by_album(album_list,semaphore):
     song_list = []
     proxies = None
     for alb_id in album_list:
@@ -208,7 +204,6 @@ def get_song_by_album(album_list):
     t.start()
     t.join()
     print 'thread analyse_song end'
-
 
 def analyse_song_page(song_list):
     global lock
@@ -345,7 +340,7 @@ if __name__ == "__main__":
     for artist in session.query(Artist):
         artist_list.append(artist.id)
     Session.remove()
-    album_process_count = 1
+    album_process_count = 5
     print album_process_count
     album_process_list = []
     artist_count = len(artist_list)
@@ -356,6 +351,7 @@ if __name__ == "__main__":
         p = multiprocessing.Process(target=get_album_by_artist, args=(artist_list_slice,))
         album_process_list.append(p)
         p.start()
+        time.sleep(100)
 
     # 等待进程结束
     for p in album_process_list:
