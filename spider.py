@@ -4,6 +4,8 @@ import Queue
 import multiprocessing
 from bs4 import BeautifulSoup
 from models import ArtistCategory, Artist, Album, Song, Comment, Session
+from sqlalchemy import exc
+
 
 baseurl = 'http://music.163.com'
 
@@ -114,9 +116,11 @@ def get_artist_by_category_id(artist_category_id_list):
     return artist_id_list
 
 
-def get_album_by_artist(artist_list):
+def get_album_by_artist(artist_list,lock,song_queue):
+    print '%s start' % threading.current_thread().getName()
     proxies = None
     album_list = []
+    song_list = []
     for artist_id in artist_list:
         url = baseurl + '/artist/album?id=%s&limit=200' % artist_id
         print url
@@ -136,31 +140,74 @@ def get_album_by_artist(artist_list):
                 # print li
                 match = re.match('.*id=(\d+)$', li.find('a')['href'])
                 if match:
-                    id = match.group(1)
-                    album_list.append(id)
-                    if len(album_list) == 1000:
-                        thread_list = []
-                        for i in range(20):
-                            album_list_slice = album_list[50*i : 50*(i+1)]
-                            t = threading.Thread(target=get_song_by_album, args=(album_list_slice,))
-                            thread_list.append(t)
-                            t.start()
-                        # 等待线程结束后，目的是为了控制内存消耗
-                        for t in thread_list:
-                            t.join()
-                        album_list = []
-    album_count = len(album_list)
-    thread_list = []
-    for i in range(20):
-        begin = album_count / 20 * i
-        end = album_count / 20 * (i + 1)
-        album_list_slice = album_list[begin:end]
-        t = threading.Thread(target=get_song_by_album, args=(album_list_slice,))
-        thread_list.append(t)
-        t.start()
-    # 等待线程结束
-    for t in thread_list:
-        t.join()
+                    alb_id = match.group(1)
+                    url = baseurl + '/album?id=%s' % alb_id
+                    print 'active thread:%d %s %s' % (
+                        threading.active_count(),
+                        threading.current_thread().getName(), url)
+                    while True:
+                        try:
+                            r = requests.get(url, proxies=proxies)
+                        except requests.exceptions.RequestException:
+                            proxies = get_availalbe_proxy()
+                        else:
+                            if r.status_code != 200:
+                                proxies = get_availalbe_proxy()
+                            else:
+                                break
+                    soup = BeautifulSoup(r.text, 'html.parser')
+                    for item in soup.find_all('a', href=re.compile('\/song\?id=\d+')):
+                        song_href = item['href']
+                        match = re.match('.*id=(\d+)$', song_href)
+                        if match:
+                            song_id = match.group(1)
+                            url = 'http://music.163.com/api/song/detail/?id=%s&ids=[%s]' % (song_id, song_id)
+                            while True:
+                                try:
+                                    r = requests.get(url, proxies=proxies)
+                                except requests.exceptions.RequestException:
+                                    proxies = get_availalbe_proxy()
+                                else:
+                                    if r.status_code != 200:
+                                        proxies = get_availalbe_proxy()
+                                    else:
+                                        break
+                            json_result = json.loads(r.content)
+                            song_list.append(json_result)
+                            if len(song_list) == 50:
+                                exitFlag = False
+                                while not exitFlag:
+                                    lock.acquire()
+                                    if song_queue.qsize() < 500:
+                                        song_queue.put(song_list)
+                                        exitFlag = True
+                                        song_list = []
+                                    lock.release()
+
+                            #album_list.append(id)
+    #                 if len(album_list) == 1000:
+    #                     thread_list = []
+    #                     for i in range(20):
+    #                         album_list_slice = album_list[50*i : 50*(i+1)]
+    #                         t = threading.Thread(target=get_song_by_album, args=(album_list_slice,))
+    #                         thread_list.append(t)
+    #                         t.start()
+    #                     # 等待线程结束后，目的是为了控制内存消耗
+    #                     for t in thread_list:
+    #                         t.join()
+    #                     album_list = []
+    # album_count = len(album_list)
+    # thread_list = []
+    # for i in range(20):
+    #     begin = album_count / 20 * i
+    #     end = album_count / 20 * (i + 1)
+    #     album_list_slice = album_list[begin:end]
+    #     t = threading.Thread(target=get_song_by_album, args=(album_list_slice,))
+    #     thread_list.append(t)
+    #     t.start()
+    # # 等待线程结束
+    # for t in thread_list:
+    #     t.join()
 
 
 def get_song_by_album(album_list):
@@ -205,132 +252,173 @@ def get_song_by_album(album_list):
     t.join()
     print 'thread analyse_song end'
 
-def analyse_song_page(song_list):
-    global lock
+def analyse_song_page(lock,song_queue):
+    print '%s start' % threading.current_thread().getName()
     proxies = None
-    db_song = []
-    db_album = []
-    db_comment = []
-    for song in song_list:
-        song_json = song['songs'][0]
-        album_json = song_json['album']
-        artist_json = song_json['artists'][0]
+    exitFlag = False
+    song_list = []
+    while True:
+        lock.acquire()
+        if not song_queue.empty():
+            song_list = song_queue.get()
+        lock.release()
+        db_song = []
+        db_album = []
+        db_comment = []
+        for song in song_list:
+            song_json = song['songs'][0]
+            album_json = song_json['album']
+            artist_json = song_json['artists'][0]
 
-        song_id = song_json['id']
-        song_name = song_json['name']
-        song_duration = song_json['duration']
-        artist_id = artist_json['id']
-        album_id = album_json['id']
-        album_name = album_json['name']
-        album_size = album_json['size']
-        album_cover = album_json['picUrl']
-        release_time = album_json['publishTime']
-        release_comp = album_json['company']
+            song_id = song_json['id']
+            song_name = song_json['name']
+            song_duration = song_json['duration']
+            artist_id = artist_json['id']
+            album_id = album_json['id']
+            album_name = album_json['name']
+            album_size = album_json['size']
+            album_cover = album_json['picUrl']
+            release_time = album_json['publishTime']
+            release_comp = album_json['company']
 
-        comment_thread = song_json['commentThreadId']
-        print 'active thread:%d %s %s songid:%s' % (
-            threading.active_count(), multiprocessing.current_process().name, threading.current_thread().getName(),
-            song_id)
+            comment_thread = song_json['commentThreadId']
+            print '%s song_id:%s' % (threading.current_thread().getName(),song_id)
 
-        url = 'http://music.163.com/weapi/v1/resource/comments/' + comment_thread
-        params = get_params(1)
-        encSecKey = get_encSecKey()
-        data = {
-            "params": params,
-            "encSecKey": encSecKey
-        }
-        while True:
-            try:
-                r = requests.post(url, data=data, proxies=proxies)
-            except requests.exceptions.RequestException:
-                proxies = get_availalbe_proxy()
-            else:
-                if r.status_code != 200:
+            url = 'http://music.163.com/weapi/v1/resource/comments/' + comment_thread
+            params = get_params(1)
+            encSecKey = get_encSecKey()
+            data = {
+                "params": params,
+                "encSecKey": encSecKey
+            }
+            while True:
+                try:
+                    r = requests.post(url, data=data, proxies=proxies)
+                except requests.exceptions.RequestException:
                     proxies = get_availalbe_proxy()
                 else:
-                    break
+                    if r.status_code != 200:
+                        proxies = get_availalbe_proxy()
+                    else:
+                        break
 
-        json_dict = json.loads(r.content)
-        total = json_dict['total']
+            json_dict = json.loads(r.content)
+            total = json_dict['total']
 
-        song = Song()
-        song.id = song_id
-        song.name = song_name
-        song.duration = song_duration
-        song.album_id = album_id
-        song.artist_id = artist_id
-        song.comment_count = total
-        db_song.append(song)
+            song = Song()
+            song.id = song_id
+            song.name = song_name
+            song.duration = song_duration
+            song.album_id = album_id
+            song.artist_id = artist_id
+            song.comment_count = total
+            db_song.append(song)
 
-        album = Album()
-        album.id = album_id
-        album.alb_name = album_name
-        album.alb_size = album_size
-        album.alb_cover = album_cover
-        album.artist_id = artist_id
-        try:
-            timestamp = str(release_time)
-            album.release_time = time.strftime('%Y-%m-%d', time.localtime(float(timestamp[:10] + '.' + timestamp[-3:])))
-        except:
-            print 'timestamp error:%s' % release_time
-            album.release_time = ''
-        album.release_comp = release_comp
-        db_album.append(album)
-
-        hot_comments = json_dict['hotComments']
-        for item in hot_comments:
-            comment = Comment()
-            comment.song_id = int(song_id)
-            # 过滤emoji表情
+            album = Album()
+            album.id = album_id
+            album.alb_name = album_name
+            album.alb_size = album_size
+            album.alb_cover = album_cover
+            album.artist_id = artist_id
             try:
-                highpoints = re.compile(u'[\U00010000-\U0010ffff]')
-            except re.error:
-                highpoints = re.compile(u'[\uD800-\uDBFF][\uDC00-\uDFFF]')
+                timestamp = str(release_time)
+                album.release_time = time.strftime('%Y-%m-%d',
+                                                   time.localtime(float(timestamp[:10] + '.' + timestamp[-3:])))
+            except:
+                print 'timestamp error:%s' % release_time
+                album.release_time = ''
+            album.release_comp = release_comp
+            if album.id not in [item.id for item in db_album]:
+                db_album.append(album)
 
-            content = highpoints.sub(u'??', item['content'])
-            comment.content = content[:300]
-            comment.liked_count = int(item['likedCount'])
-            timestamp = str(item['time'])
-            comment.timestamp = time.strftime('%Y%m%d%H%M%S',
-                                              time.localtime(float(timestamp[:10] + '.' + timestamp[-3:])))
-            comment.user_id = int(item['user']['userId'])
-            comment.nickname = item['user']['nickname']
-            db_comment.append(comment)
+            hot_comments = json_dict['hotComments']
+            for item in hot_comments:
+                comment = Comment()
+                comment.song_id = int(song_id)
+                # 过滤emoji表情
+                try:
+                    highpoints = re.compile(u'[\U00010000-\U0010ffff]')
+                except re.error:
+                    highpoints = re.compile(u'[\uD800-\uDBFF][\uDC00-\uDFFF]')
 
-        session = Session()
-        session.execute(
-            Song.__table__.insert().prefix_with('IGNORE'),
-            [{'id': song.id,
-              'name': song.name,
-              'duration': song.duration,
-              'artist_id': song.artist_id,
-              'album_id': song.album_id,
-              'artist_id': song.artist_id,
-              'comment_count': song.comment_count
-              } for song in db_song]
-        )
-        for comment in db_comment:
-            session.add(comment)
-        for album in db_album:
-            flag = True
-            for inner_album in db_album:
-                if inner_album != album and album.id == inner_album.id:
-                    flag = False
+                content = highpoints.sub(u'??', item['content'])
+                comment.content = content[:300]
+                comment.liked_count = int(item['likedCount'])
+                timestamp = str(item['time'])
+                comment.timestamp = time.strftime('%Y%m%d%H%M%S',
+                                                  time.localtime(float(timestamp[:10] + '.' + timestamp[-3:])))
+                comment.user_id = int(item['user']['userId'])
+                comment.nickname = item['user']['nickname']
+                db_comment.append(comment)
+
+            #写入数据库
+            while True:
+                try:
+                    session = Session()
+                    session.execute(
+                        Song.__table__.insert().prefix_with('IGNORE'),
+                        [{'id': song.id,
+                          'name': song.name,
+                          'duration': song.duration,
+                          'artist_id': song.artist_id,
+                          'album_id': song.album_id,
+                          'artist_id': song.artist_id,
+                          'comment_count': song.comment_count
+                          } for song in db_song]
+                    )
+                except exc.OperationalError:
+                    print 'OperationalError'
+                    session.rollback()
+                    continue
+                finally:
+                    session.commit()
+                    Session.remove()
                     break
-            if flag:
-                session.execute(
-                    Album.__table__.insert().prefix_with('IGNORE'),
-                    {'id': album.id,
-                     'alb_name': album.alb_name,
-                     'alb_desc': '',
-                     'alb_cover': album.alb_cover,
-                     'alb_size': album.alb_size,
-                     'artist_id': album.artist_id,
-                     'release_time': album.release_time,
-                     'release_comp': album.release_comp}
-                )
-        session.commit()
-        Session.remove()
+            while True:
+                try:
+                    session = Session()
+                    session.execute(
+                        Comment.__table__.insert().prefix_with('IGNORE'),
+                        [{'song_id': comment.song_id,
+                          'content': comment.content,
+                          'liked_count': comment.liked_count,
+                          'timestamp': comment.timestamp,
+                          'user_id': comment.user_id,
+                          'nickname': comment.nickname
+                          } for comment in db_comment]
+                    )
+                except exc.OperationalError:
+                    print 'OperationalError'
+                    session.rollback()
+                    continue
+                finally:
+                    session.commit()
+                    Session.remove()
+                    break
+            while True:
+                try:
+                    session = Session()
+                    for album in db_album:
+                        session.execute(
+                            Album.__table__.insert().prefix_with('IGNORE'),
+                            {'id': album.id,
+                             'alb_name': album.alb_name,
+                             'alb_desc': '',
+                             'alb_cover': album.alb_cover,
+                             'alb_size': album.alb_size,
+                             'artist_id': album.artist_id,
+                             'release_time': album.release_time,
+                             'release_comp': album.release_comp}
+                        )
+                except exc.OperationalError:
+                    print 'OperationalError'
+                    session.rollback()
+                    continue
+                finally:
+                    session.commit()
+                    Session.remove()
+                    break
+
 
 if __name__ == "__main__":
     # artist_category_list = get_artist_category_ids()
@@ -340,19 +428,29 @@ if __name__ == "__main__":
     for artist in session.query(Artist):
         artist_list.append(artist.id)
     Session.remove()
-    album_process_count = 5
-    print album_process_count
-    album_process_list = []
-    artist_count = len(artist_list)
-    for i in range(album_process_count):
-        begin = artist_count / album_process_count * i
-        end = artist_count / album_process_count * (i + 1)
-        artist_list_slice = artist_list[begin:end]
-        p = multiprocessing.Process(target=get_album_by_artist, args=(artist_list_slice,))
-        album_process_list.append(p)
-        p.start()
-        time.sleep(100)
 
-    # 等待进程结束
-    for p in album_process_list:
-        p.join()
+    lock = threading.Lock()
+    song_queue = Queue.Queue()
+
+    album_thread_count = 2
+    song_thread_count = 3
+    print album_thread_count,song_thread_count
+    album_thread_list = []
+    song_thread_list = []
+    artist_count = len(artist_list)
+    for i in range(album_thread_count):
+        begin = artist_count / album_thread_count * i
+        end = artist_count / album_thread_count * (i + 1)
+        artist_list_slice = artist_list[begin:end]
+        t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,lock,song_queue))
+        album_thread_list.append(t)
+        t.start()
+        #time.sleep(100)
+
+    for i in range(song_thread_count):
+        t = threading.Thread(target=analyse_song_page, args=(lock,song_queue,))
+        t.setDaemon(True)
+        t.start()
+
+    for t in album_thread_list:
+        t.join()
