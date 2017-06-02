@@ -142,9 +142,7 @@ def get_album_by_artist(artist_list,lock,song_queue):
                 if match:
                     alb_id = match.group(1)
                     url = baseurl + '/album?id=%s' % alb_id
-                    print 'active thread:%d %s %s' % (
-                        threading.active_count(),
-                        threading.current_thread().getName(), url)
+                    print '%s %s' % (threading.current_thread().getName(), url)
                     while True:
                         try:
                             r = requests.get(url, proxies=proxies)
