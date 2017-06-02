@@ -172,7 +172,7 @@ def get_album_by_artist(artist_list,lock,song_queue):
                                         break
                             json_result = json.loads(r.content)
                             song_list.append(json_result)
-                            if len(song_list) == 500:
+                            if len(song_list) == 100:
                                 exitFlag = False
                                 while not exitFlag:
                                     print '%s lock acquiring...' % threading.current_thread().getName()
