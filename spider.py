@@ -116,8 +116,8 @@ def get_artist_by_category_id(artist_category_id_list):
     return artist_id_list
 
 
-def get_album_by_artist(artist_list,lock,song_queue):
-    print '%s start' % threading.current_thread().getName()
+def get_album_by_artist(artist_list):
+    #print '%s start' % threading.current_thread().getName()
     proxies = None
     album_list = []
     song_list = []
@@ -159,65 +159,24 @@ def get_album_by_artist(artist_list,lock,song_queue):
                         match = re.match('.*id=(\d+)$', song_href)
                         if match:
                             song_id = match.group(1)
-                            url = 'http://music.163.com/api/song/detail/?id=%s&ids=[%s]' % (song_id, song_id)
-                            while True:
-                                try:
-                                    r = requests.get(url, proxies=proxies)
-                                except requests.exceptions.RequestException:
-                                    proxies = get_availalbe_proxy()
-                                else:
-                                    if r.status_code != 200:
-                                        proxies = get_availalbe_proxy()
-                                    else:
-                                        break
-                            json_result = json.loads(r.content)
-                            song_list.append(json_result)
-                            if len(song_list) == 200:
-                                exitFlag = False
-                                while not exitFlag:
-                                    print '%s lock acquiring...' % threading.current_thread().getName()
-                                    lock.acquire()
-                                    if song_queue.qsize() < 10:
-                                        song_queue.put(song_list)
-                                        exitFlag = True
-                                        song_list = []
-                                    lock.release()
-    if len(song_list) > 0:
-        exitFlag = False
-        while not exitFlag:
-            print '%s lock acquiring...' % threading.current_thread().getName()
-            lock.acquire()
-            if song_queue.qsize() < 10:
-                song_queue.put(song_list)
-                exitFlag = True
-                song_list = []
-            lock.release()
-
-                            #album_list.append(id)
-    #                 if len(album_list) == 1000:
-    #                     thread_list = []
-    #                     for i in range(20):
-    #                         album_list_slice = album_list[50*i : 50*(i+1)]
-    #                         t = threading.Thread(target=get_song_by_album, args=(album_list_slice,))
-    #                         thread_list.append(t)
-    #                         t.start()
-    #                     # 等待线程结束后，目的是为了控制内存消耗
-    #                     for t in thread_list:
-    #                         t.join()
-    #                     album_list = []
-    # album_count = len(album_list)
-    # thread_list = []
-    # for i in range(20):
-    #     begin = album_count / 20 * i
-    #     end = album_count / 20 * (i + 1)
-    #     album_list_slice = album_list[begin:end]
-    #     t = threading.Thread(target=get_song_by_album, args=(album_list_slice,))
-    #     thread_list.append(t)
-    #     t.start()
-    # # 等待线程结束
-    # for t in thread_list:
-    #     t.join()
-
+                            song_list.append(song_id)
+                            # url = 'http://music.163.com/api/song/detail/?id=%s&ids=[%s]' % (song_id, song_id)
+                            # while True:
+                            #     try:
+                            #         r = requests.get(url, proxies=proxies)
+                            #     except requests.exceptions.RequestException:
+                            #         proxies = get_availalbe_proxy()
+                            #     else:
+                            #         if r.status_code != 200:
+                            #             proxies = get_availalbe_proxy()
+                            #         else:
+                            #             break
+                            # json_result = json.loads(r.content)
+                            # song_list.append(json_result)
+    print len(song_id)
+    fpout = open('song_id_result','w')
+    fpout.write(','.join(song_id))
+    fpout.close()
 
 def get_song_by_album(album_list):
     song_list = []
@@ -439,30 +398,31 @@ if __name__ == "__main__":
         artist_list.append(artist.id)
     Session.remove()
 
-    lock = threading.Lock()
-    song_queue = Queue.Queue()
+    get_album_by_artist(artist_list)
 
-    album_thread_count = int(sys.argv[1])
-    song_thread_count = int(sys.argv[2])
-    print album_thread_count,song_thread_count
-    album_thread_list = []
-    song_thread_list = []
-    artist_count = len(artist_list)
-    for i in range(album_thread_count):
-        begin = artist_count / album_thread_count * i
-        end = artist_count / album_thread_count * (i + 1)
-        artist_list_slice = artist_list[begin:end]
-        t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,lock,song_queue))
-        album_thread_list.append(t)
-        t.start()
-        #time.sleep(100)
-
-    for i in range(song_thread_count):
-        t = threading.Thread(target=analyse_song_page, args=(lock,song_queue,))
-        song_thread_list.append(t)
-        t.start()
-
-    for t in album_thread_list:
-        t.join()
-    for t in song_thread_list:
-        t.join()
+    # lock = threading.Lock()
+    # song_queue = Queue.Queue()
+    #
+    # album_thread_count = int(sys.argv[1])
+    # song_thread_count = int(sys.argv[2])
+    # print album_thread_count,song_thread_count
+    # album_thread_list = []
+    # song_thread_list = []
+    # artist_count = len(artist_list)
+    # for i in range(album_thread_count):
+    #     begin = artist_count / album_thread_count * i
+    #     end = artist_count / album_thread_count * (i + 1)
+    #     artist_list_slice = artist_list[begin:end]
+    #     t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,lock,song_queue))
+    #     album_thread_list.append(t)
+    #     t.start()
+    #
+    # for i in range(song_thread_count):
+    #     t = threading.Thread(target=analyse_song_page, args=(lock,song_queue,))
+    #     song_thread_list.append(t)
+    #     t.start()
+    #
+    # for t in album_thread_list:
+    #     t.join()
+    # for t in song_thread_list:
+    #     t.join()
