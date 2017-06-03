@@ -172,16 +172,26 @@ def get_album_by_artist(artist_list,lock,song_queue):
                                         break
                             json_result = json.loads(r.content)
                             song_list.append(json_result)
-                            if len(song_list) == 100:
+                            if len(song_list) == 200:
                                 exitFlag = False
                                 while not exitFlag:
                                     print '%s lock acquiring...' % threading.current_thread().getName()
                                     lock.acquire()
-                                    if song_queue.qsize() < 5000:
+                                    if song_queue.qsize() < 10:
                                         song_queue.put(song_list)
                                         exitFlag = True
                                         song_list = []
                                     lock.release()
+    if len(song_list) > 0:
+        exitFlag = False
+        while not exitFlag:
+            print '%s lock acquiring...' % threading.current_thread().getName()
+            lock.acquire()
+            if song_queue.qsize() < 10:
+                song_queue.put(song_list)
+                exitFlag = True
+                song_list = []
+            lock.release()
 
                             #album_list.append(id)
     #                 if len(album_list) == 1000:
@@ -449,8 +459,10 @@ if __name__ == "__main__":
 
     for i in range(song_thread_count):
         t = threading.Thread(target=analyse_song_page, args=(lock,song_queue,))
-        t.setDaemon(True)
+        song_thread_list.append(t)
         t.start()
 
     for t in album_thread_list:
+        t.join()
+    for t in song_thread_list:
         t.join()
