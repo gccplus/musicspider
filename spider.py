@@ -250,7 +250,6 @@ def analyse_song_page(song_list):
                         r = requests.get(url, proxies=proxies)
                     finally:
                         break
-        song = json.loads(r.content)
 
         song_json = song['songs'][0]
         album_json = song_json['album']
