@@ -1,73 +1,13 @@
 # coding=utf-8
-import sys, requests, re, threading, time
+import sys, requests, re, threading, time,json
 import Queue
 import multiprocessing
 from bs4 import BeautifulSoup
-from models import ArtistCategory, Artist, Album, Song, Comment, Session
 from sqlalchemy import exc
-
-
-baseurl = 'http://music.163.com'
-
-from Crypto.Cipher import AES
-import base64
-import json
-
-# offset的取值为:(评论页数-1)*20,total第一页为true，其余页为false
-# first_param = '{rid:"", offset:"0", total:"true", limit:"20", csrf_token:""}' # 第一个参数
-second_param = "010001"  # 第二个参数
-third_param = "00e0b509f6259df8642dbc35662901477df22677ec152b5ff68ace615bb7b725152b3ab17a876aea8a5aa76d2e417629ec4ee341f56135fccf695280104e0312ecbda92557c93870114af6c9d05c4f7f0c3685b7a46bee255932575cce10b424d813cfe4875d3e82047b97ddef52741d546b8e289dc6935b3ece0462db0a22b8e7"
-forth_param = "0CoJUm6Qyw8W8jud"
-
-
-# 获取参数
-def get_params(page):
-    iv = "0102030405060708"
-    first_key = forth_param
-    second_key = 16 * 'F'
-    if (page == 1):
-        first_param = '{rid:"", offset:"0", total:"true", limit:"20", csrf_token:""}'
-        h_encText = AES_encrypt(first_param, first_key, iv)
-    else:
-        offset = str((page - 1) * 20)
-        first_param = '{rid:"", offset:"%s", total:"%s", limit:"20", csrf_token:""}' % (offset, 'false')
-        h_encText = AES_encrypt(first_param, first_key, iv)
-    h_encText = AES_encrypt(h_encText, second_key, iv)
-    return h_encText
-
-
-# 获取 encSecKey
-def get_encSecKey():
-    encSecKey = "257348aecb5e556c066de214e531faadd1c55d814f9be95fd06d6bff9f4c7a41f831f6394d5a3fd2e3881736d94a02ca919d952872e7d0a50ebfa1769a7a62d512f5f1ca21aec60bc3819a9c3ffca5eca9a0dba6d6f7249b06f5965ecfff3695b54e1c28f3f624750ed39e7de08fc8493242e26dbc4484a01c76f739e135637c"
-    return encSecKey
-
-
-# 加密过程
-def AES_encrypt(text, key, iv):
-    pad = 16 - len(text) % 16
-    text = text + pad * chr(pad)
-    encryptor = AES.new(key, AES.MODE_CBC, iv)
-    encrypt_text = encryptor.encrypt(text)
-    encrypt_text = base64.b64encode(encrypt_text)
-    return encrypt_text
-
-
-def get_availalbe_proxy():
-    while True:
-        url = 'http://api.ip.data5u.com/api/get.shtml?order=fdf986b1d0dfcbc98b72155d2d41826a&num=10&area=%E4%B8%AD%E5%9B%BD&carrier=2&protocol=0&an1=1&an2=2&an3=3&sp1=1&sort=1&system=1&distinct=0&rettype=1&seprator=,'
-        r = requests.get(url)
-        for proxy in r.text.split(','):
-            proxies = {"http": proxy, "https": proxy}
-            try:
-                requests.get('http://music.163.com/', proxies=proxies, timeout=1)
-            except requests.Timeout:
-                print 'timeout:' + proxy
-            except requests.ConnectionError:
-                print 'connection:' + proxy
-            else:
-                print proxies
-                return proxies
-
+from app.utils import get_availalbe_proxy
+from app.models import ArtistCategory, Artist, Album, Song, Comment
+from app import Session,baseurl
+from app.api import get_params,get_encSecKey
 
 def get_artist_category_ids():
     url = baseurl + '/discover/artist'
@@ -115,14 +55,14 @@ def get_artist_by_category_id(artist_category_id_list):
                         session.commit()
     return artist_id_list
 
-
-def get_album_by_artist(artist_list,fp,lock):
+def get_songid_by_artist(artist_list,fp,lock):
     #print '%s start' % threading.current_thread().getName()
     proxies = None
     album_list = []
     song_list = []
     artist_count = 0
     album_count = 0
+    #遍历歌手
     for artist_id in artist_list:
         artist_count += 1
         url = baseurl + '/artist/album?id=%s&limit=200' % artist_id
@@ -138,6 +78,7 @@ def get_album_by_artist(artist_list,fp,lock):
                 else:
                     break
         soup = BeautifulSoup(r.text, 'html.parser')
+        #遍历所有专辑
         for item in soup.find_all(id='m-song-module'):
             for li in item.find_all('li'):
                 # print li
@@ -164,78 +105,23 @@ def get_album_by_artist(artist_list,fp,lock):
                         if match:
                             song_id = match.group(1)
                             song_list.append(song_id)
-                            # url = 'http://music.163.com/api/song/detail/?id=%s&ids=[%s]' % (song_id, song_id)
-                            # while True:
-                            #     try:
-                            #         r = requests.get(url, proxies=proxies)
-                            #     except requests.exceptions.RequestException:
-                            #         proxies = get_availalbe_proxy()
-                            #     else:
-                            #         if r.status_code != 200:
-                            #             proxies = get_availalbe_proxy()
-                            #         else:
-                            #             break
-                            # json_result = json.loads(r.content)
-                            # song_list.append(json_result)
-
     lock.acquire()
     fp.write('\n'.join(song_list))
     fp.write('\n')
     lock.release()
 
-
-def get_song_by_album(album_list):
-    song_list = []
-    proxies = None
-    for alb_id in album_list:
-        url = baseurl + '/album?id=%s' % alb_id
-        print 'active thread:%d %s %s %s' % (
-            threading.active_count(), multiprocessing.current_process().name, threading.current_thread().getName(), url)
-        while True:
-            try:
-                r = requests.get(url, proxies=proxies)
-            except requests.exceptions.RequestException:
-                proxies = get_availalbe_proxy()
-            else:
-                if r.status_code != 200:
-                    proxies = get_availalbe_proxy()
-                else:
-                    break
-        soup = BeautifulSoup(r.text, 'html.parser')
-        for item in soup.find_all('a', href=re.compile('\/song\?id=\d+')):
-            song_href = item['href']
-            match = re.match('.*id=(\d+)$', song_href)
-            if match:
-                song_id = match.group(1)
-                url = 'http://music.163.com/api/song/detail/?id=%s&ids=[%s]' % (song_id, song_id)
-                while True:
-                    try:
-                        r = requests.get(url, proxies=proxies)
-                    except requests.exceptions.RequestException:
-                        proxies = get_availalbe_proxy()
-                    else:
-                        if r.status_code != 200:
-                            proxies = get_availalbe_proxy()
-                        else:
-                            break
-                json_result = json.loads(r.content)
-                song_list.append(json_result)
-
-    t = threading.Thread(target=analyse_song_page, args=(song_list,))
-    t.start()
-    t.join()
-    print 'thread analyse_song end'
-
-def analyse_song_page(song_list):
+def get_song_details(song_list):
     print '%s start' % threading.current_thread().getName()
     proxies = None
     db_song = []
     db_album = []
     db_comment = []
-    error_file = open(threading.current_thread().getName(),'w')
+    error_file = open(threading.current_thread().getName()+'.txt','w')
+    #遍历songid_list
     for song_id in song_list:
         url = 'http://music.163.com/api/song/detail/?id=%s&ids=[%s]' % (song_id, song_id)
         song = None
+        flag = False
         while True:
             try:
                 r = requests.get(url, proxies=proxies)
@@ -250,11 +136,15 @@ def analyse_song_page(song_list):
                     except:
                         print 'parse json error'
                         continue
-                    finally:
-                        if len(song['songs']) < 0:
+                    else:
+                        if not len(song['songs']) > 0:
+                            print 'error_song_id:%s' % song_id
                             error_file.write(song_id)
                             error_file.write('\n')
+                            flag = True
                         break
+        if flag:
+            continue
 
         song_json = song['songs'][0]
         album_json = song_json['album']
@@ -341,6 +231,8 @@ def analyse_song_page(song_list):
             comment.nickname = item['user']['nickname']
             db_comment.append(comment)
     error_file.close()
+
+    #更新数据库
     while True:
         try:
             session = Session()
@@ -413,7 +305,7 @@ if __name__ == "__main__":
     # artist_list = get_artist_by_category_id(artist_category_list)
     artist_list = []
     session = Session()
-    for artist in session.query(Artist):
+    for artist in session.query(Artist)[:10]:
         artist_list.append(artist.id)
     Session.remove()
 
@@ -427,21 +319,21 @@ if __name__ == "__main__":
     artist_count = len(artist_list)
     print 'artist count:%d' % artist_count
 
-    album_thread_list = []
-    fp = open(song_list_filename, 'a')
-    for i in range(album_thread_count):
-        begin = artist_count / album_thread_count * i
-        end = artist_count / album_thread_count * (i + 1)
-        artist_list_slice = artist_list[begin:end]
-        t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,fp,lock,))
-        album_thread_list.append(t)
-        t.start()
-
-    for t in album_thread_list:
-        t.join()
-
-    fp.close()
-    print 'successfully saved to song_list_result.txt'
+    # album_thread_list = []
+    # fp = open(song_list_filename, 'a')
+    # for i in range(album_thread_count):
+    #     begin = artist_count / album_thread_count * i
+    #     end = artist_count / album_thread_count * (i + 1)
+    #     artist_list_slice = artist_list[begin:end]
+    #     t = threading.Thread(target=get_songid_by_artist, args=(artist_list_slice,fp,lock,))
+    #     album_thread_list.append(t)
+    #     t.start()
+    #
+    # for t in album_thread_list:
+    #     t.join()
+    #
+    # fp.close()
+    # print 'successfully saved to song_list_result.txt'
 
     fp = open(song_list_filename,'r')
     song_list_file = fp.read().split('\n')
@@ -456,36 +348,8 @@ if __name__ == "__main__":
         begin = song_count / song_thread_count * i
         end = song_count / song_thread_count * (i + 1)
         song_list_slice = song_list[begin:end]
-        t = threading.Thread(target=analyse_song_page, args=(song_list_slice,))
+        t = threading.Thread(target=get_song_details, args=(song_list_slice,))
         song_thread_list.append(t)
         t.start()
     for t in song_thread_list:
         t.join()
-
-
-    # lock = threading.Lock()
-    # song_queue = Queue.Queue()
-    #
-    # album_thread_count = int(sys.argv[1])
-    # song_thread_count = int(sys.argv[2])
-    # print album_thread_count,song_thread_count
-    # album_thread_list = []
-    # song_thread_list = []
-    # artist_count = len(artist_list)
-    # for i in range(album_thread_count):
-    #     begin = artist_count / album_thread_count * i
-    #     end = artist_count / album_thread_count * (i + 1)
-    #     artist_list_slice = artist_list[begin:end]
-    #     t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,lock,song_queue))
-    #     album_thread_list.append(t)
-    #     t.start()
-    #
-    # for i in range(song_thread_count):
-    #     t = threading.Thread(target=analyse_song_page, args=(lock,song_queue,))
-    #     song_thread_list.append(t)
-    #     t.start()
-    #
-    # for t in album_thread_list:
-    #     t.join()
-    # for t in song_thread_list:
-    #     t.join()
