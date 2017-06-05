@@ -444,7 +444,8 @@ if __name__ == "__main__":
     sql_result = session.execute('select id from song').fetchall()
     song_list_sql = [item[0] for item in sql_result]
     Session.remove()
-
+    print len(song_list_sql)
+    print len(song_list_file)
     song_list = [ id for id in song_list_file if id not in song_list_sql ]
     song_count = len(song_list)
     print song_count
