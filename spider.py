@@ -424,24 +424,24 @@ if __name__ == "__main__":
     album_thread_count = int(sys.argv[1])
     song_thread_count = int(sys.argv[2])
 
-    # artist_count = len(artist_list)
-    # print 'artist count:%d' % artist_count
-    #
-    # album_thread_list = []
-    # fp = open(song_list_filename, 'a')
-    # for i in range(album_thread_count):
-    #     begin = artist_count / album_thread_count * i
-    #     end = artist_count / album_thread_count * (i + 1)
-    #     artist_list_slice = artist_list[begin:end]
-    #     t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,fp,lock,))
-    #     album_thread_list.append(t)
-    #     t.start()
-    #
-    # for t in album_thread_list:
-    #     t.join()
-    #
-    # fp.close()
-    # print 'successfully saved to song_list_result.txt'
+    artist_count = len(artist_list)
+    print 'artist count:%d' % artist_count
+
+    album_thread_list = []
+    fp = open(song_list_filename, 'a')
+    for i in range(album_thread_count):
+        begin = artist_count / album_thread_count * i
+        end = artist_count / album_thread_count * (i + 1)
+        artist_list_slice = artist_list[begin:end]
+        t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,fp,lock,))
+        album_thread_list.append(t)
+        t.start()
+
+    for t in album_thread_list:
+        t.join()
+
+    fp.close()
+    print 'successfully saved to song_list_result.txt'
 
     fp = open(song_list_filename,'r')
     song_list_file = fp.read().split('\n')
