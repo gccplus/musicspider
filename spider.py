@@ -410,7 +410,7 @@ if __name__ == "__main__":
     lock = threading.Lock()
     song_json_queue = Queue.Queue()
 
-    album_thread_count = 10
+    album_thread_count = 100
     song_thread_count = 50
 
     artist_count = len(artist_list)
