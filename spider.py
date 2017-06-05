@@ -305,13 +305,13 @@ if __name__ == "__main__":
     # artist_list = get_artist_by_category_id(artist_category_list)
     artist_list = []
     session = Session()
-    for artist in session.query(Artist)[:10]:
+    for artist in session.query(Artist):
         artist_list.append(artist.id)
     Session.remove()
 
     lock = threading.Lock()
     song_json_queue = Queue.Queue()
-    song_list_filename = 'song_list_result.txt'
+    song_list_filename = 'song_list.txt'
 
     album_thread_count = int(sys.argv[1])
     song_thread_count = int(sys.argv[2])
