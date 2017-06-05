@@ -445,7 +445,7 @@ if __name__ == "__main__":
         begin = song_count / song_thread_count * i
         end = song_count / song_thread_count * (i + 1)
         song_list_slice = song_list[begin:end]
-        t = threading.Thread(target=analyse_song_page, args=(song_list_slice,lock,song_json_queue))
+        t = threading.Thread(target=analyse_song_page, args=(song_list_slice))
         song_thread_list.append(t)
         t.start()
     for t in song_thread_list:
