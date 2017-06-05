@@ -121,7 +121,7 @@ def get_album_by_artist(artist_list,fp,lock):
     proxies = None
     album_list = []
     song_list = []
-    aritst_count = 0
+    artist_count = 0
     album_count = 0
     for artist_id in artist_list:
         artist_count += 1
