@@ -2,7 +2,7 @@
 网易云音乐爬虫
 基本思路是先爬取所有artist，根据artist爬取album，根据album爬取song_id
 
-最后根据 http://music.163.com/api/song/detail/?id=186016&ids=[186016] 这个api 获取歌曲以及专辑信息
+根据 http://music.163.com/api/song/detail/?id=186016&ids=[186016] 这个api 获取歌曲以及专辑信息
 
 根据 http://music.163.com/weapi/v1/resource/comments/R_SO_4_186016 获取歌曲评论
 
