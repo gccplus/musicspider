@@ -233,6 +233,7 @@ def analyse_song_page(song_list):
     db_comment = []
     for song_id in song_list:
         url = 'http://music.163.com/api/song/detail/?id=%s&ids=[%s]' % (song_id, song_id)
+        print url
         while True:
             try:
                 r = requests.get(url, proxies=proxies)
@@ -261,7 +262,7 @@ def analyse_song_page(song_list):
         release_comp = album_json['company']
 
         comment_thread = song_json['commentThreadId']
-        print '%s song_id:%s' % (threading.current_thread().getName(),song_id)
+        print 'active_thread:%d current_thread:%s song_id:%s' % (threading.active_count(),threading.current_thread().getName(),song_id)
 
         url = 'http://music.163.com/weapi/v1/resource/comments/' + comment_thread
         params = get_params(1)
@@ -411,24 +412,24 @@ if __name__ == "__main__":
     album_thread_count = int(sys.argv[1])
     song_thread_count = int(sys.argv[2])
 
-    artist_count = len(artist_list)
-    print 'artist count:%d' % artist_count
-    song_list_filename = 'song_list_result.txt'
-    album_thread_list = []
-    fp = open(song_list_filename, 'a')
-    for i in range(album_thread_count):
-        begin = artist_count / album_thread_count * i
-        end = artist_count / album_thread_count * (i + 1)
-        artist_list_slice = artist_list[begin:end]
-        t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,fp,lock,))
-        album_thread_list.append(t)
-        t.start()
-
-    for t in album_thread_list:
-        t.join()
-
-    fp.close()
-    print 'successfully saved to song_list_result.txt'
+    # artist_count = len(artist_list)
+    # print 'artist count:%d' % artist_count
+    # song_list_filename = 'song_list_result.txt'
+    # album_thread_list = []
+    # fp = open(song_list_filename, 'a')
+    # for i in range(album_thread_count):
+    #     begin = artist_count / album_thread_count * i
+    #     end = artist_count / album_thread_count * (i + 1)
+    #     artist_list_slice = artist_list[begin:end]
+    #     t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,fp,lock,))
+    #     album_thread_list.append(t)
+    #     t.start()
+    #
+    # for t in album_thread_list:
+    #     t.join()
+    #
+    # fp.close()
+    # print 'successfully saved to song_list_result.txt'
 
     fp = open(song_list_filename,'r')
     song_list_file = fp.read().split('\n')
@@ -439,6 +440,7 @@ if __name__ == "__main__":
 
     song_list = [ id for id in song_list_file if id not in song_list_sql ]
     song_count = len(song_list)
+    print song_count
     song_thread_list = []
     for i in range(song_thread_count):
         begin = song_count / song_thread_count * i
