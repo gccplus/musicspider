@@ -403,7 +403,7 @@ if __name__ == "__main__":
     # artist_list = get_artist_by_category_id(artist_category_list)
     artist_list = []
     session = Session()
-    for artist in session.query(Artist):
+    for artist in session.query(Artist)[:100]:
         artist_list.append(artist.id)
     Session.remove()
 
