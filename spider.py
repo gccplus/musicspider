@@ -251,6 +251,7 @@ def analyse_song_page(song_list):
                     finally:
                         break
 
+
         song_json = song['songs'][0]
         album_json = song_json['album']
         artist_json = song_json['artists'][0]
