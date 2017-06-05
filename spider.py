@@ -414,6 +414,7 @@ if __name__ == "__main__":
     song_thread_count = 50
 
     artist_count = len(artist_list)
+    print 'artist count:%d' % artist_count
     song_list_filename = 'song_list_result.txt'
     album_thread_list = []
     fp = open(song_list_filename, 'a')
@@ -421,7 +422,7 @@ if __name__ == "__main__":
         begin = artist_count / album_thread_count * i
         end = artist_count / album_thread_count * (i + 1)
         artist_list_slice = artist_list[begin:end]
-        t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,fp,lock))
+        t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,fp,lock,))
         album_thread_list.append(t)
         t.start()
 
@@ -445,7 +446,7 @@ if __name__ == "__main__":
         begin = song_count / song_thread_count * i
         end = song_count / song_thread_count * (i + 1)
         song_list_slice = song_list[begin:end]
-        t = threading.Thread(target=analyse_song_page, args=(song_list_slice))
+        t = threading.Thread(target=analyse_song_page, args=(song_list_slice,))
         song_thread_list.append(t)
         t.start()
     for t in song_thread_list:
