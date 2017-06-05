@@ -233,6 +233,7 @@ def analyse_song_page(song_list):
     db_comment = []
     for song_id in song_list:
         url = 'http://music.163.com/api/song/detail/?id=%s&ids=[%s]' % (song_id, song_id)
+        print url
         song = None
         while True:
             try:
@@ -250,7 +251,6 @@ def analyse_song_page(song_list):
                         r = requests.get(url, proxies=proxies)
                     finally:
                         break
-        print song
         song_json = song['songs'][0]
         album_json = song_json['album']
         artist_json = song_json['artists'][0]
@@ -438,10 +438,10 @@ if __name__ == "__main__":
     # print 'successfully saved to song_list_result.txt'
 
     fp = open(song_list_filename,'r')
-    song_list_file = map(lambda x:long(x),fp.read().split('\n'))
+    song_list_file = fp.read().split('\n')
     session = Session()
     sql_result = session.execute('select id from song').fetchall()
-    song_list_sql = [item[0] for item in sql_result]
+    song_list_sql = [str(item[0]) for item in sql_result]
     Session.remove()
     print song_list_sql
     print song_list_file
