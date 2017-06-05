@@ -246,15 +246,14 @@ def analyse_song_page(song_list):
                 else:
                     try:
                         song = json.loads(r.content)
-                        print song['songs'][0]['id']
+                        if len(song['songs']) < 0:
+                            continue
                     except:
-                        r = requests.get(url, proxies=proxies)
+                        print 'parse json error'
+                        continue
                     finally:
                         break
-        try:
-            song_json = song['songs'][0]
-        except:
-            print song
+        song_json = song['songs'][0]
         album_json = song_json['album']
         artist_json = song_json['artists'][0]
 
