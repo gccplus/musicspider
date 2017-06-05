@@ -180,6 +180,7 @@ def get_album_by_artist(artist_list,fp,lock):
 
     lock.acquire()
     fp.write('\n'.join(song_list))
+    fp.write('\n')
     lock.release()
 
 
