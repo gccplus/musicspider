@@ -438,7 +438,7 @@ if __name__ == "__main__":
     # print 'successfully saved to song_list_result.txt'
 
     fp = open(song_list_filename,'r')
-    song_list_file = map(lambda x:str(x),fp.read().split('\n'))
+    song_list_file = map(lambda x:long(x),fp.read().split('\n'))
     session = Session()
     sql_result = session.execute('select id from song').fetchall()
     song_list_sql = [item[0] for item in sql_result]
