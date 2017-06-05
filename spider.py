@@ -253,8 +253,7 @@ def analyse_song_page(song_list):
                         break
         try:
             song_json = song['songs'][0]
-        except e:
-            print e
+        except:
             print song
         album_json = song_json['album']
         artist_json = song_json['artists'][0]
