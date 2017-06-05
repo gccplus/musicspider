@@ -251,7 +251,11 @@ def analyse_song_page(song_list):
                         r = requests.get(url, proxies=proxies)
                     finally:
                         break
-        song_json = song['songs'][0]
+        try:
+            song_json = song['songs'][0]
+        except e:
+            print e
+            print song
         album_json = song_json['album']
         artist_json = song_json['artists'][0]
 
