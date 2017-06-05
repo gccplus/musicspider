@@ -126,7 +126,7 @@ def get_album_by_artist(artist_list,fp,lock):
     for artist_id in artist_list:
         artist_count += 1
         url = baseurl + '/artist/album?id=%s&limit=200' % artist_id
-        print '%s %s %d %d' % (threading.current_thread().getName(), url, artist_count,len(song_list))
+        print 'active_thread:%d current_thread:%s %s %d %d' % (threading.active_count, threading.current_thread().getName(), url, artist_count,len(song_list))
         while True:
             try:
                 r = requests.get(url, proxies=proxies)
@@ -146,7 +146,7 @@ def get_album_by_artist(artist_list,fp,lock):
                     alb_id = match.group(1)
                     album_count += 1
                     url = baseurl + '/album?id=%s' % alb_id
-                    print '%s %s album_count:%d' % (threading.current_thread().getName(), url, album_count)
+                    print 'active_thread:%d current_thread:%s %s album_count:%d' % (threading.active_count,threading.current_thread().getName(), url, album_count)
                     while True:
                         try:
                             r = requests.get(url, proxies=proxies)
@@ -178,11 +178,9 @@ def get_album_by_artist(artist_list,fp,lock):
                             # json_result = json.loads(r.content)
                             # song_list.append(json_result)
 
-    while True:
-        print '%s lock acquiring...' % threading.current_thread().getName()
-        lock.acquire()
-        fp.write('\n'.join(song_list))
-        lock.release()
+    lock.acquire()
+    fp.write('\n'.join(song_list))
+    lock.release()
 
 
 def get_song_by_album(album_list):
