@@ -408,13 +408,14 @@ if __name__ == "__main__":
 
     lock = threading.Lock()
     song_json_queue = Queue.Queue()
+    song_list_filename = 'song_list_result.txt'
 
     album_thread_count = int(sys.argv[1])
     song_thread_count = int(sys.argv[2])
 
     # artist_count = len(artist_list)
     # print 'artist count:%d' % artist_count
-    # song_list_filename = 'song_list_result.txt'
+    #
     # album_thread_list = []
     # fp = open(song_list_filename, 'a')
     # for i in range(album_thread_count):
