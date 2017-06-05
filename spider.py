@@ -121,9 +121,12 @@ def get_album_by_artist(artist_list,fp,lock):
     proxies = None
     album_list = []
     song_list = []
+    aritst_count = 0
+    album_count = 0
     for artist_id in artist_list:
+        artist_count += 1
         url = baseurl + '/artist/album?id=%s&limit=200' % artist_id
-        print url
+        print '%s %s %d %d' % (threading.current_thread().getName(), url, artist_count,len(song_list))
         while True:
             try:
                 r = requests.get(url, proxies=proxies)
@@ -141,8 +144,9 @@ def get_album_by_artist(artist_list,fp,lock):
                 match = re.match('.*id=(\d+)$', li.find('a')['href'])
                 if match:
                     alb_id = match.group(1)
+                    album_count += 1
                     url = baseurl + '/album?id=%s' % alb_id
-                    print '%s %s' % (threading.current_thread().getName(), url)
+                    print '%s %s album_count:%d' % (threading.current_thread().getName(), url, album_count)
                     while True:
                         try:
                             r = requests.get(url, proxies=proxies)
@@ -420,7 +424,6 @@ if __name__ == "__main__":
         t = threading.Thread(target=get_album_by_artist, args=(artist_list_slice,fp,lock))
         album_thread_list.append(t)
         t.start()
-
 
     for t in album_thread_list:
         t.join()
