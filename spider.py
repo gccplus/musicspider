@@ -232,9 +232,9 @@ def analyse_song_page(song_list):
     db_song = []
     db_album = []
     db_comment = []
+    error_file = open(threading.current_thread().getName(),'w')
     for song_id in song_list:
         url = 'http://music.163.com/api/song/detail/?id=%s&ids=[%s]' % (song_id, song_id)
-        print url
         song = None
         while True:
             try:
@@ -247,13 +247,15 @@ def analyse_song_page(song_list):
                 else:
                     try:
                         song = json.loads(r.content)
-                        if len(song['songs']) < 0:
-                            continue
                     except:
                         print 'parse json error'
                         continue
                     finally:
+                        if len(song['songs']) < 0:
+                            error_file.write(song_id)
+                            error_file.write('\n')
                         break
+
         song_json = song['songs'][0]
         album_json = song_json['album']
         artist_json = song_json['artists'][0]
@@ -338,6 +340,7 @@ def analyse_song_page(song_list):
             comment.user_id = int(item['user']['userId'])
             comment.nickname = item['user']['nickname']
             db_comment.append(comment)
+    error_file.close()
     while True:
         try:
             session = Session()
@@ -448,7 +451,6 @@ if __name__ == "__main__":
     Session.remove()
     song_list = [ id for id in song_list_file if id not in song_list_sql ]
     song_count = len(song_list)
-    print song_list,song_count
     song_thread_list = []
     for i in range(song_thread_count):
         begin = song_count / song_thread_count * i
