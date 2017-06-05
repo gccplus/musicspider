@@ -233,7 +233,7 @@ def analyse_song_page(song_list):
     db_comment = []
     for song_id in song_list:
         url = 'http://music.163.com/api/song/detail/?id=%s&ids=[%s]' % (song_id, song_id)
-        print url
+        song = None
         while True:
             try:
                 r = requests.get(url, proxies=proxies)
@@ -243,7 +243,13 @@ def analyse_song_page(song_list):
                 if r.status_code != 200:
                     proxies = get_availalbe_proxy()
                 else:
-                    break
+                    try:
+                        song = json.loads(r.content)
+                        print song['songs'][0]
+                    except:
+                        r = requests.get(url, proxies=proxies)
+                    finally:
+                        break
         song = json.loads(r.content)
 
         song_json = song['songs'][0]
