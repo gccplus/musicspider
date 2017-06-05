@@ -239,13 +239,13 @@ def analyse_song_page(song_list):
                 r = requests.get(url, proxies=proxies)
             except requests.exceptions.RequestException:
                 proxies = get_availalbe_proxy()
-            else:
+            finally:
                 if r.status_code != 200:
                     proxies = get_availalbe_proxy()
                 else:
                     try:
                         song = json.loads(r.content)
-                        print song['songs'][0]
+                        print song['songs'][0]['id']
                     except:
                         r = requests.get(url, proxies=proxies)
                     finally:
