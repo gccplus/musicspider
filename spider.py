@@ -448,7 +448,7 @@ if __name__ == "__main__":
     Session.remove()
     song_list = [ id for id in song_list_file if id not in song_list_sql ]
     song_count = len(song_list)
-    print song_list
+    print song_list,song_count
     song_thread_list = []
     for i in range(song_thread_count):
         begin = song_count / song_thread_count * i
