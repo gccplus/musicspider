@@ -251,7 +251,7 @@ def get_song_details(song_list):
             print 'OperationalError'
             session.rollback()
             continue
-        finally:
+        else:
             session.commit()
             Session.remove()
             break
@@ -272,7 +272,7 @@ def get_song_details(song_list):
             print 'OperationalError'
             session.rollback()
             continue
-        finally:
+        else:
             session.commit()
             Session.remove()
             break
@@ -295,7 +295,7 @@ def get_song_details(song_list):
             print 'OperationalError'
             session.rollback()
             continue
-        finally:
+        else:
             session.commit()
             Session.remove()
             break
@@ -342,6 +342,7 @@ if __name__ == "__main__":
     song_list_sql = [str(item[0]) for item in sql_result]
     Session.remove()
     song_list = [ id for id in song_list_file if id not in song_list_sql ]
+    song_list = song_list[:10000]
     song_count = len(song_list)
     song_thread_list = []
     for i in range(song_thread_count):

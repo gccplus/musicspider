@@ -10,8 +10,8 @@ def get_availalbe_proxy():
                 requests.get('http://music.163.com/', proxies=proxies, timeout=1)
             except requests.Timeout:
                 print 'timeout:' + proxy
-            except requests.ConnectionError:
-                print 'connection:' + proxy
+            except requests.RequestException:
+                print 'request error:' + proxy
             else:
                 print proxies
                 return proxies
