@@ -348,12 +348,15 @@ if __name__ == "__main__":
     song_count = len(song_list)
     print 'song count:%d' % song_count
     song_thread_list = []
-    for i in range(song_thread_count):
-        begin = song_count / song_thread_count * i
-        end = song_count / song_thread_count * (i + 1)
-        song_list_slice = song_list[begin:end]
-        t = threading.Thread(target=get_song_details, args=(song_list_slice,))
-        song_thread_list.append(t)
-        t.start()
-    for t in song_thread_list:
-        t.join()
+    for j in range(10):
+        print 'j:%d' %j
+        song_list_inner = song_list[song_count/10*j:song_count/10*(j+1)]
+        for i in range(song_thread_count):
+            begin = len(song_list_inner) / song_thread_count * i
+            end = len(song_list_inner) / song_thread_count * (i + 1)
+            song_list_slice = song_list_inner[begin:end]
+            t = threading.Thread(target=get_song_details, args=(song_list_slice,))
+            song_thread_list.append(t)
+            t.start()
+        for t in song_thread_list:
+            t.join()
