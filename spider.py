@@ -118,10 +118,10 @@ def get_song_details(song_list):
     db_comment = []
     error_file = open(threading.current_thread().getName()+'.txt','w')
     #遍历songid_list
-    count = 0
-    total = len(song_list)
+    curcount = 0
+    totalcount = len(song_list)
     for song_id in song_list:
-        count += 1
+        curcount += 1
         url = 'http://music.163.com/api/song/detail/?id=%s&ids=[%s]' % (song_id, song_id)
         song = None
         flag = False
@@ -165,7 +165,7 @@ def get_song_details(song_list):
         release_comp = album_json['company']
 
         comment_thread = song_json['commentThreadId']
-        print 'active_thread:%d current_thread:%s song_id:%s %d/%d' % (threading.active_count(),threading.current_thread().getName(),song_id,count,total)
+        print 'active_thread:%d current_thread:%s song_id:%s %d/%d' % (threading.active_count(),threading.current_thread().getName(),song_id,curcount,totalcount)
 
         url = 'http://music.163.com/weapi/v1/resource/comments/' + comment_thread
         params = get_params(1)
