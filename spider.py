@@ -348,5 +348,6 @@ if __name__ == "__main__":
             song_list_slice = song_list[begin:end]
             t = threading.Thread(target=get_song_details, args=(song_list_slice,semaphore,))
             song_thread_list.append(t)
+            time.sleep(5)
             t.start()
 
