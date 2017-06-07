@@ -116,7 +116,7 @@ def get_song_details(song_list):
     db_song = []
     db_album = []
     db_comment = []
-    error_file = open(threading.current_thread().getName()+'.txt','w')
+    error_file = open(threading.current_thread().getName()+'.txt','a')
     #遍历songid_list
     curcount = 0
     totalcount = len(song_list)
@@ -234,7 +234,7 @@ def get_song_details(song_list):
             comment.nickname = item['user']['nickname']
             db_comment.append(comment)
     error_file.close()
-    print 'start update database'
+    print '%s:start table song' % threading.current_thread().getName()
     #更新数据库
     while True:
         try:
@@ -258,6 +258,7 @@ def get_song_details(song_list):
             session.commit()
             Session.remove()
             break
+    print '%s:start table comment' % threading.current_thread().getName()
     while True:
         try:
             session = Session()
@@ -279,6 +280,7 @@ def get_song_details(song_list):
             session.commit()
             Session.remove()
             break
+    print '%s:start table album' % threading.current_thread().getName()
     while True:
         try:
             session = Session()
@@ -302,6 +304,7 @@ def get_song_details(song_list):
             session.commit()
             Session.remove()
             break
+    print '%s end' % threading.current_thread().getName()
 
 if __name__ == "__main__":
     # artist_category_list = get_artist_category_ids()
