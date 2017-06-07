@@ -174,6 +174,7 @@ def get_song_details(song_list):
             "params": params,
             "encSecKey": encSecKey
         }
+        json_comment = None
         while True:
             try:
                 r = requests.post(url, data=data, proxies=proxies)
@@ -183,10 +184,13 @@ def get_song_details(song_list):
                 if r.status_code != 200:
                     proxies = get_availalbe_proxy()
                 else:
-                    break
+                    try:
+                        json_comment = json.loads(r.content)
+                    except:
+                        print 'parse json error'
+                        continue
 
-        json_dict = json.loads(r.content)
-        total = json_dict['total']
+        total = json_comment.get('total',0)
 
         song = Song()
         song.id = song_id
@@ -213,8 +217,7 @@ def get_song_details(song_list):
         album.release_comp = release_comp
         if album.id not in [item.id for item in db_album]:
             db_album.append(album)
-
-        hot_comments = json_dict['hotComments']
+        hot_comments = json_comment['hotComments']
         for item in hot_comments:
             comment = Comment()
             comment.song_id = int(song_id)
@@ -230,8 +233,10 @@ def get_song_details(song_list):
             timestamp = str(item['time'])
             comment.timestamp = time.strftime('%Y%m%d%H%M%S',
                                               time.localtime(float(timestamp[:10] + '.' + timestamp[-3:])))
-            comment.user_id = int(item['user']['userId'])
-            comment.nickname = item['user']['nickname']
+            comment_user = item.get('user')
+            if comment_user:
+                comment.user_id = int(comment_user.get('userId',0))
+                comment.nickname = comment_user.get('nickname')
             db_comment.append(comment)
     error_file.close()
     print '%s:start table song' % threading.current_thread().getName()
