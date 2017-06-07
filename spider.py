@@ -110,7 +110,7 @@ def get_songid_by_artist(artist_list,fp,lock):
     fp.write('\n')
     lock.release()
 
-def get_song_details(song_list):
+def get_song_details(song_list,sem):
     print '%s start' % threading.current_thread().getName()
     proxies = None
     db_song = []
@@ -239,7 +239,7 @@ def get_song_details(song_list):
                 comment.nickname = comment_user.get('nickname')
             db_comment.append(comment)
     error_file.close()
-    print '%s:start table song' % threading.current_thread().getName()
+    print '%s:start update database' % threading.current_thread().getName()
     #更新数据库
     while True:
         try:
@@ -255,18 +255,6 @@ def get_song_details(song_list):
                   'comment_count': song.comment_count
                   } for song in db_song]
             )
-        except exc.OperationalError:
-            print 'OperationalError'
-            session.rollback()
-            continue
-        else:
-            session.commit()
-            Session.remove()
-            break
-    print '%s:start table comment' % threading.current_thread().getName()
-    while True:
-        try:
-            session = Session()
             session.execute(
                 Comment.__table__.insert().prefix_with('IGNORE'),
                 [{'song_id': comment.song_id,
@@ -277,18 +265,6 @@ def get_song_details(song_list):
                   'nickname': comment.nickname
                   } for comment in db_comment]
             )
-        except exc.OperationalError:
-            print 'OperationalError'
-            session.rollback()
-            continue
-        else:
-            session.commit()
-            Session.remove()
-            break
-    print '%s:start table album' % threading.current_thread().getName()
-    while True:
-        try:
-            session = Session()
             for album in db_album:
                 session.execute(
                     Album.__table__.insert().prefix_with('IGNORE'),
@@ -310,6 +286,7 @@ def get_song_details(song_list):
             Session.remove()
             break
     print '%s end' % threading.current_thread().getName()
+    sem.release()
 
 if __name__ == "__main__":
     # artist_category_list = get_artist_category_ids()
@@ -326,6 +303,7 @@ if __name__ == "__main__":
 
     album_thread_count = int(sys.argv[1])
     song_thread_count = int(sys.argv[2])
+    concurrent = int(sys.argv[3])
 
     artist_count = len(artist_list)
     print 'artist count:%d' % artist_count
@@ -360,16 +338,15 @@ if __name__ == "__main__":
     song_list = [ id for id in song_list_file if not trie_sql.search(id) ]
     song_count = len(song_list)
     print 'song count:%d' % song_count
+
+    semaphore = threading.Semaphore(concurrent)
     song_thread_list = []
-    for j in range(10):
-        print 'j:%d' %j
-        song_list_inner = song_list[song_count/10*j:song_count/10*(j+1)]
-        for i in range(song_thread_count):
-            begin = len(song_list_inner) / song_thread_count * i
-            end = len(song_list_inner) / song_thread_count * (i + 1)
-            song_list_slice = song_list_inner[begin:end]
-            t = threading.Thread(target=get_song_details, args=(song_list_slice,))
+    for i in range(song_thread_count):
+        if semaphore.acquire():
+            begin = song_count / song_thread_count * i
+            end = song_count / song_thread_count * (i + 1)
+            song_list_slice = song_list[begin:end]
+            t = threading.Thread(target=get_song_details, args=(song_list_slice,semaphore,))
             song_thread_list.append(t)
             t.start()
-        for t in song_thread_list:
-            t.join()
+
