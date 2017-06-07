@@ -4,7 +4,7 @@ import Queue
 import multiprocessing
 from bs4 import BeautifulSoup
 from sqlalchemy import exc
-from app.utils import get_availalbe_proxy
+from app.utils import get_availalbe_proxy,Trie
 from app.models import ArtistCategory, Artist, Album, Song, Comment
 from app import Session,baseurl
 from app.api import get_params,get_encSecKey
@@ -347,7 +347,12 @@ if __name__ == "__main__":
     sql_result = session.execute('select id from song').fetchall()
     song_list_sql = [str(item[0]) for item in sql_result]
     Session.remove()
-    song_list = [ id for id in song_list_file if id not in song_list_sql ]
+
+    trie_sql = Trie()
+    for song_sql in song_list_sql:
+        trie_sql.insert(song_sql)
+
+    song_list = [ id for id in song_list_file if not trie_sql.search(id) ]
     song_count = len(song_list)
     print 'song count:%d' % song_count
     song_thread_list = []

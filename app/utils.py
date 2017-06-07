@@ -1,3 +1,4 @@
+# coding:utf-8
 import requests
 
 def get_availalbe_proxy():
@@ -15,3 +16,43 @@ def get_availalbe_proxy():
             else:
                 print proxies
                 return proxies
+
+class TrieNode(object):
+    def __init__(self):
+        """
+        Initialize your data structure here.
+        """
+        self.data = {}
+        self.is_word = False
+
+
+class Trie(object):
+    def __init__(self):
+        self.root = TrieNode()
+
+    def insert(self, word):
+        """
+        Inserts a word into the trie.
+        :type word: str
+        :rtype: void
+        """
+        node = self.root
+        for letter in word:
+            child = node.data.get(letter)
+            if not child:
+                node.data[letter] = TrieNode()
+            node = node.data[letter]
+        node.is_word = True
+
+    def search(self, word):
+        """
+        Returns if the word is in the trie.
+        :type word: str
+        :rtype: bool
+        """
+        node = self.root
+        for letter in word:
+            node = node.data.get(letter)
+            if not node:
+                return False
+        return node.is_word  # 判断单词是否是完整的存在在trie树中
