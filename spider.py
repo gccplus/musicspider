@@ -1,15 +1,17 @@
 # coding=utf-8
-import sys, requests, re, threading, time,json
+import sys, requests, re, threading, time, json
 import Queue
 import multiprocessing
 from bs4 import BeautifulSoup
 from sqlalchemy import exc
-from app.utils import get_availalbe_proxy,Trie
+from app.utils import get_availalbe_proxy, Trie
 from app.models import ArtistCategory, Artist, Album, Song, Comment
-from app import Session,baseurl
-from app.api import get_params,get_encSecKey
+from app import Session, baseurl
+from app.api import get_params, get_encSecKey
+
 
 def get_artist_category_ids():
+    session = Session()
     url = baseurl + '/discover/artist'
     r = requests.get(url)
     soup = BeautifulSoup(r.text, 'html.parser')
@@ -28,23 +30,24 @@ def get_artist_category_ids():
                 artist_category.name = catname.encode('utf-8')
                 session.add(artist_category)
                 session.commit()
+    Session.remove()
     return artist_category_id_list
 
 
 def get_artist_by_category_id(artist_category_id_list):
+    session = Session()
     artist_id_list = []
     for catid in artist_category_id_list:
-        for initial in range(ord('A'), ord('Z') + 1):
+        for initial in [0]+range(ord('A'), ord('Z') + 1):
             url = baseurl + '/discover/artist/cat?id=%s&initial=%d' % (catid, initial)
             print url
             r = requests.get(url)
             soup = BeautifulSoup(r.text, 'html.parser')
-            for item in soup.find_all(class_='sml'):
-                # print item.a.string,item.a['href']
-                match = re.match('.*id=(\d+)$', item.a['href'])
+            for item in soup.find_all('a'):
+                match = re.match('/artist\?id=(\d+)$', item['href'])
                 if match:
                     artist_id = match.group(1)
-                    artist_name = item.a.string
+                    artist_name = item['title'][:-3]
                     artist_id_list.append(artist_id)
                     if not session.query(Artist).get(artist_id):
                         artist = Artist()
@@ -53,20 +56,25 @@ def get_artist_by_category_id(artist_category_id_list):
                         artist.category_id = catid
                         session.add(artist)
                         session.commit()
+    Session.remove()
     return artist_id_list
 
-def get_songid_by_artist(artist_list,fp,lock):
-    #print '%s start' % threading.current_thread().getName()
+
+def get_songid_by_artist(artist_list, song_list_filename, sem, lock):
+    # print '%s start' % threading.current_thread().getName()
     proxies = None
     album_list = []
     song_list = []
     artist_count = 0
     album_count = 0
-    #遍历歌手
+    # 遍历歌手
+    current_artist_count = 0
+    total_artist_count = len(artist_list)
     for artist_id in artist_list:
-        artist_count += 1
+        current_artist_count += 1
         url = baseurl + '/artist/album?id=%s&limit=200' % artist_id
-        print 'active_thread:%d current_thread:%s %s %d %d' % (threading.active_count(), threading.current_thread().getName(), url, artist_count,len(song_list))
+        print 'active_thread:%d current_thread:%s %s artist_id:%s %d/%d' % (
+        threading.active_count(), threading.current_thread().getName(), url, artist_id, current_artist_count, total_artist_count)
         while True:
             try:
                 r = requests.get(url, proxies=proxies)
@@ -78,16 +86,20 @@ def get_songid_by_artist(artist_list,fp,lock):
                 else:
                     break
         soup = BeautifulSoup(r.text, 'html.parser')
-        #遍历所有专辑
+        # 遍历所有专辑
         for item in soup.find_all(id='m-song-module'):
-            for li in item.find_all('li'):
+            album_li_list = item.find_all('li')
+            total_album_count = len(album_li_list)
+            for li in album_li_list:
                 # print li
                 match = re.match('.*id=(\d+)$', li.find('a')['href'])
                 if match:
                     alb_id = match.group(1)
                     album_count += 1
                     url = baseurl + '/album?id=%s' % alb_id
-                    print 'active_thread:%d current_thread:%s %s album_count:%d' % (threading.active_count(),threading.current_thread().getName(), url, album_count)
+                    #print 'active_thread:%d current_thread:%s %s album_id:%s %d/%d' % (
+                    #threading.active_count(), threading.current_thread().getName(), url, alb_id, album_count,
+                    #total_album_count)
                     while True:
                         try:
                             r = requests.get(url, proxies=proxies)
@@ -106,18 +118,22 @@ def get_songid_by_artist(artist_list,fp,lock):
                             song_id = match.group(1)
                             song_list.append(song_id)
     lock.acquire()
-    fp.write('\n'.join(song_list))
-    fp.write('\n')
+    with open(song_list_filename,'a') as fp:
+        fp.write('\n'.join(song_list))
+        fp.write('\n')
     lock.release()
 
-def get_song_details(song_list,sem):
+    sem.release()
+
+
+def get_song_details(song_list, sem):
     print '%s start' % threading.current_thread().getName()
     proxies = None
     db_song = []
     db_album = []
     db_comment = []
-    error_file = open(threading.current_thread().getName()+'.txt','a')
-    #遍历songid_list
+    error_file = open(threading.current_thread().getName() + '.txt', 'a')
+    # 遍历songid_list
     curcount = 0
     totalcount = len(song_list)
     for song_id in song_list:
@@ -165,7 +181,8 @@ def get_song_details(song_list,sem):
         release_comp = album_json['company']
 
         comment_thread = song_json['commentThreadId']
-        print 'active_thread:%d current_thread:%s song_id:%s %d/%d' % (threading.active_count(),threading.current_thread().getName(),song_id,curcount,totalcount)
+        print 'active_thread:%d current_thread:%s song_id:%s %d/%d' % (
+        threading.active_count(), threading.current_thread().getName(), song_id, curcount, totalcount)
 
         url = 'http://music.163.com/weapi/v1/resource/comments/' + comment_thread
         params = get_params(1)
@@ -192,7 +209,7 @@ def get_song_details(song_list,sem):
                     else:
                         break
 
-        total = json_comment.get('total',0)
+        total = json_comment.get('total', 0)
 
         song = Song()
         song.id = song_id
@@ -237,12 +254,12 @@ def get_song_details(song_list,sem):
                                               time.localtime(float(timestamp[:10] + '.' + timestamp[-3:])))
             comment_user = item.get('user')
             if comment_user:
-                comment.user_id = int(comment_user.get('userId',0))
+                comment.user_id = int(comment_user.get('userId', 0))
                 comment.nickname = comment_user.get('nickname')
             db_comment.append(comment)
     error_file.close()
     print '%s:start update database' % threading.current_thread().getName()
-    #更新数据库
+    # 更新数据库
     while True:
         try:
             session = Session()
@@ -290,65 +307,79 @@ def get_song_details(song_list,sem):
     print '%s end' % threading.current_thread().getName()
     sem.release()
 
+
 if __name__ == "__main__":
-    # artist_category_list = get_artist_category_ids()
-    # artist_list = get_artist_by_category_id(artist_category_list)
-    artist_list = []
-    session = Session()
-    for artist in session.query(Artist):
-        artist_list.append(artist.id)
-    Session.remove()
-
-    lock = threading.Lock()
-    song_json_queue = Queue.Queue()
-    song_list_filename = 'song_list.txt'
-
     album_thread_count = int(sys.argv[1])
     song_thread_count = int(sys.argv[2])
     concurrent = int(sys.argv[3])
 
+    lock = threading.Lock()
+    song_list_filename = 'song_list2.txt'
+
+    artist_category_list = get_artist_category_ids()
+    artist_list_spider = get_artist_by_category_id(artist_category_list)
+
+    # artist_list_spider = []
+    # session = Session()
+    # for artist in session.query(Artist)[:100]:
+    #     artist_list_spider.append(artist.id)
+    # Session.remove()
+
+    session = Session()
+    sql_result = session.execute('select distinct artist_id from album').fetchall()
+    artist_list_sql = [str(item[0]) for item in sql_result]
+    Session.remove()
+
+    artist_trie_sql = Trie()
+    for artist_sql in artist_list_sql:
+        artist_trie_sql.insert(artist_sql)
+
+    artist_list = [id for id in artist_list_spider if not artist_trie_sql.search(id)]
     artist_count = len(artist_list)
     print 'artist count:%d' % artist_count
 
-    # album_thread_list = []
-    # fp = open(song_list_filename, 'a')
-    # for i in range(album_thread_count):
-    #     begin = artist_count / album_thread_count * i
-    #     end = artist_count / album_thread_count * (i + 1)
-    #     artist_list_slice = artist_list[begin:end]
-    #     t = threading.Thread(target=get_songid_by_artist, args=(artist_list_slice,fp,lock,))
-    #     album_thread_list.append(t)
-    #     t.start()
-    #
-    # for t in album_thread_list:
-    #     t.join()
-    #
-    # fp.close()
-    # print 'successfully saved to song_list_result.txt'
+    try:
+        with open(song_list_filename, 'r') as fp:
+            song_list_file = fp.read().split('\n')
+    except IOError as err:
+        print str(err)
+        album_thread_list = []
+        artist_semaphore = threading.Semaphore(concurrent)
+        for i in range(album_thread_count):
+            if artist_semaphore.acquire():
+                begin = artist_count / album_thread_count * i
+                end = artist_count / album_thread_count * (i + 1)
+                artist_list_slice = artist_list[begin:end]
+                t = threading.Thread(target=get_songid_by_artist,
+                                     args=(artist_list_slice, song_list_filename, artist_semaphore, lock,))
+                album_thread_list.append(t)
+                t.start()
+        for t in album_thread_list:
+            t.join()
+        print 'successfully saved to song_list_result.txt'
+        with open(song_list_filename, 'r') as fp:
+            song_list_file = fp.read().split('\n')
 
-    fp = open(song_list_filename,'r')
-    song_list_file = fp.read().split('\n')
     session = Session()
     sql_result = session.execute('select id from song').fetchall()
     song_list_sql = [str(item[0]) for item in sql_result]
     Session.remove()
 
-    trie_sql = Trie()
+    song_trie_sql = Trie()
     for song_sql in song_list_sql:
-        trie_sql.insert(song_sql)
+        song_trie_sql.insert(song_sql)
 
-    song_list = [ id for id in song_list_file if not trie_sql.search(id) ]
+    song_list = [id for id in song_list_file if not song_trie_sql.search(id)]
     song_count = len(song_list)
     print 'song count:%d' % song_count
 
-    semaphore = threading.Semaphore(concurrent)
+    song_semaphore = threading.Semaphore(concurrent)
     song_thread_list = []
     for i in range(song_thread_count):
         if semaphore.acquire():
             begin = song_count / song_thread_count * i
             end = song_count / song_thread_count * (i + 1)
             song_list_slice = song_list[begin:end]
-            t = threading.Thread(target=get_song_details, args=(song_list_slice,semaphore,))
+            t = threading.Thread(target=get_song_details, args=(song_list_slice, song_semaphore,))
             song_thread_list.append(t)
             t.start()
-
