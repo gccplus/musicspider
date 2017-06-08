@@ -117,14 +117,12 @@ def get_songid_by_artist(artist_list, song_list_filename, sem, lock):
                         if match:
                             song_id = match.group(1)
                             song_list.append(song_id)
-    lock.acquire()
+
     with open(song_list_filename,'a') as fp:
         fp.write('\n'.join(song_list))
         fp.write('\n')
-    lock.release()
 
     sem.release()
-
 
 def get_song_details(song_list, sem):
     print '%s start' % threading.current_thread().getName()
@@ -316,14 +314,14 @@ if __name__ == "__main__":
     lock = threading.Lock()
     song_list_filename = 'song_list2.txt'
 
-    artist_category_list = get_artist_category_ids()
-    artist_list_spider = get_artist_by_category_id(artist_category_list)
+    # artist_category_list = get_artist_category_ids()
+    # artist_list_spider = get_artist_by_category_id(artist_category_list)
 
-    # artist_list_spider = []
-    # session = Session()
-    # for artist in session.query(Artist)[:100]:
-    #     artist_list_spider.append(artist.id)
-    # Session.remove()
+    artist_list_spider = []
+    session = Session()
+    for artist in session.query(Artist):
+        artist_list_spider.append(artist.id)
+    Session.remove()
 
     session = Session()
     sql_result = session.execute('select distinct artist_id from album').fetchall()
