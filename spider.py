@@ -60,7 +60,7 @@ def get_artist_by_category_id(artist_category_id_list):
     return artist_id_list
 
 
-def get_songid_by_artist(artist_list, song_list_filename, sem, lock):
+def get_songid_by_artist(artist_list, song_list_filename, sem):
     # print '%s start' % threading.current_thread().getName()
     proxies = None
     album_list = []
@@ -311,30 +311,30 @@ if __name__ == "__main__":
     song_thread_count = int(sys.argv[2])
     concurrent = int(sys.argv[3])
 
-    lock = threading.Lock()
+    #lock = threading.Lock()
     song_list_filename = 'song_list2.txt'
 
     # artist_category_list = get_artist_category_ids()
     # artist_list_spider = get_artist_by_category_id(artist_category_list)
 
-    artist_list_spider = []
-    session = Session()
-    for artist in session.query(Artist):
-        artist_list_spider.append(artist.id)
-    Session.remove()
-
-    session = Session()
-    sql_result = session.execute('select distinct artist_id from album').fetchall()
-    artist_list_sql = [str(item[0]) for item in sql_result]
-    Session.remove()
-
-    artist_trie_sql = Trie()
-    for artist_sql in artist_list_sql:
-        artist_trie_sql.insert(artist_sql)
-
-    artist_list = [id for id in artist_list_spider if not artist_trie_sql.search(id)]
-    artist_count = len(artist_list)
-    print 'artist count:%d' % artist_count
+    # artist_list_spider = []
+    # session = Session()
+    # for artist in session.query(Artist):
+    #     artist_list_spider.append(artist.id)
+    # Session.remove()
+    #
+    # session = Session()
+    # sql_result = session.execute('select distinct artist_id from album').fetchall()
+    # artist_list_sql = [str(item[0]) for item in sql_result]
+    # Session.remove()
+    #
+    # artist_trie_sql = Trie()
+    # for artist_sql in artist_list_sql:
+    #     artist_trie_sql.insert(artist_sql)
+    #
+    # artist_list = [id for id in artist_list_spider if not artist_trie_sql.search(id)]
+    # artist_count = len(artist_list)
+    # print 'artist count:%d' % artist_count
 
     try:
         with open(song_list_filename, 'r') as fp:
@@ -349,7 +349,7 @@ if __name__ == "__main__":
                 end = artist_count / album_thread_count * (i + 1)
                 artist_list_slice = artist_list[begin:end]
                 t = threading.Thread(target=get_songid_by_artist,
-                                     args=(artist_list_slice, song_list_filename, artist_semaphore, lock,))
+                                     args=(artist_list_slice, song_list_filename, artist_semaphore,))
                 album_thread_list.append(t)
                 t.start()
         for t in album_thread_list:
