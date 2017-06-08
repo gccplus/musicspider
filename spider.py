@@ -374,7 +374,7 @@ if __name__ == "__main__":
     song_semaphore = threading.Semaphore(concurrent)
     song_thread_list = []
     for i in range(song_thread_count):
-        if semaphore.acquire():
+        if song_semaphore.acquire():
             begin = song_count / song_thread_count * i
             end = song_count / song_thread_count * (i + 1)
             song_list_slice = song_list[begin:end]
